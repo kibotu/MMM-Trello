@@ -47,6 +47,24 @@ Trello.prototype.getChecklist = async function (checkListId) {
   }
 }
 
+Trello.prototype.getMember = async function (memberId) {
+  const queryString = querystring.stringify(this.addAuthArgs({
+    fields: "id,avatarUrl,fullName,initials"
+  }));
+  const res = await fetch(`${this.host}/1/members/${memberId}?${queryString}`);
+  if (res.ok) {
+    return res.json();
+  } else {
+    const errorText = await res.text();
+    const error = {
+      statusCode: res.status,
+      statusMessage: res.statusText,
+      responseBody: errorText
+    };
+    throw error;
+  }
+}
+
 Trello.prototype.addAuthArgs = function (args) {
   args.key = this.key;
 

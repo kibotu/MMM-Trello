@@ -71,6 +71,44 @@ module.exports = NodeHelper.create({
                 };
             }
 
+            // Fetch members if not included in response
+            const allMemberIds = new Set();
+            cards.forEach(card => {
+                if (card.idMembers && card.idMembers.length > 0) {
+                    card.idMembers.forEach(memberId => allMemberIds.add(memberId));
+                }
+            });
+
+            // If members are not already in the response, fetch them
+            if (allMemberIds.size > 0 && (!cards[0] || !cards[0].members)) {
+                try {
+                    const memberPromises = Array.from(allMemberIds).map(memberId => 
+                        trello.getMember(memberId).catch(err => {
+                            console.log(`Failed to fetch member ${memberId}:`, err);
+                            return null;
+                        })
+                    );
+                    const members = await Promise.all(memberPromises);
+                    const memberData = {};
+                    members.forEach(member => {
+                        if (member) {
+                            memberData[member.id] = member;
+                        }
+                    });
+
+                    // Attach members to cards
+                    cards.forEach(card => {
+                        if (card.idMembers && card.idMembers.length > 0) {
+                            card.members = card.idMembers
+                                .map(memberId => memberData[memberId])
+                                .filter(m => m !== undefined && m !== null);
+                        }
+                    });
+                } catch (memberError) {
+                    console.log("Error fetching members, continuing without member data:", memberError);
+                }
+            }
+
             //Get all checklists before sending list
             const cardsWithChecklists = cards.filter(d => !!d.idChecklists);
             const checkListIds = cardsWithChecklists.flatMap(card => card.idChecklists);
