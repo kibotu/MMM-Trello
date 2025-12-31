@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMM-Trello Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            color: #fff;
+        }
+        
+        .status {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            background: #2a2a2a;
+        }
+        
+        .status.loading {
+            background: #2a4a6a;
+        }
+        
+        .status.error {
+            background: #6a2a2a;
+            color: #ffaaaa;
+        }
+        
+        .status.success {
+            background: #2a6a4a;
+            color: #aaffaa;
+        }
+        
+        .card {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0079bf;
+        }
+        
+        .card-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .card-description {
+            color: #ccc;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+        }
+        
+        .card-due {
+            color: #ffa500;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        
+        .members-wrapper {
+            display: flex;
+            flex-direction: row;
+            gap: 0.5em;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .member-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+        }
+        
+        .member-avatar:hover {
+            border-color: #0079bf;
+            transform: scale(1.1);
+            transition: all 0.2s;
+        }
+        
+        .checklist-wrapper {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #444;
+        }
+        
+        .checklist-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .checklist-item {
+            padding: 5px 0;
+            color: #ccc;
+        }
+        
+        .checklist-item.complete {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+        
+        .checklist-item::before {
+            content: "☐ ";
+            margin-right: 5px;
+        }
+        
+        .checklist-item.complete::before {
+            content: "☑ ";
+        }
+        
+        button {
+            background: #0079bf;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        button:hover {
+            background: #005a8f;
+        }
+        
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        .info {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MMM-Trello Test Page</h1>
+        
+        <div class="info">
+            <strong>Testing:</strong> Trello API integration with member avatars<br>
+            <strong>List ID:</strong> <span id="listId"></span><br>
+            <strong>Status:</strong> <span id="status">Ready</span>
+        </div>
+        
+        <button id="loadBtn" onclick="loadCards()">Load Trello Cards</button>
+        
+        <div id="statusDiv" class="status" style="display: none;"></div>
+        <div id="cardsContainer"></div>
+    </div>
+
+    <script>
+        // Configuration from test-config.json
+        const config = {
+            api_key: "apikey",
+            token: "token",
+            list: "listid"
+        };
+
+        document.getElementById('listId').textContent = config.list;
+
+        function addAuthArgs(params) {
+            params.key = config.api_key;
+            params.token = config.token;
+            return params;
+        }
+
+        function buildQueryString(params) {
+            return Object.keys(params)
+                .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+                .join('&');
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusDiv');
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'status ' + type;
+            statusDiv.textContent = message;
+            document.getElementById('status').textContent = message;
+        }
+
+        async function getCards() {
+            const params = addAuthArgs({
+                fields: "name,desc,due,idChecklists,idMembers",
+                member_fields: "id,avatarUrl,fullName,initials"
+            });
+            
+            const queryString = buildQueryString(params);
+            // Use proxy endpoint to avoid CORS issues
+            const url = `/api/trello/1/lists/${config.list}/cards?${queryString}`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw {
+                    statusCode: response.status,
+                    statusMessage: response.statusText,
+                    responseBody: errorText
+                };
+            }
+            
+            return await response.json();
+        }
+
+        async function getChecklist(checklistId) {
+            const params = addAuthArgs({});
+            const queryString = buildQueryString(params);
+            // Use proxy endpoint to avoid CORS issues
+            const url = `/api/trello/1/checklists/${checklistId}?${queryString}`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch checklist: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        }
+
+        async function getMember(memberId) {
+            const params = addAuthArgs({
+                fields: "id,avatarUrl,fullName,initials"
+            });
+            const queryString = buildQueryString(params);
+            // Use proxy endpoint to avoid CORS issues
+            const url = `/api/trello/1/members/${memberId}?${queryString}`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                console.warn(`Failed to fetch member ${memberId}: ${response.statusText}`);
+                return null;
+            }
+            
+            return await response.json();
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return null;
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = date - now;
+            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            
+            if (days < 0) {
+                return `${Math.abs(days)} day${Math.abs(days) !== 1 ? 's' : ''} ago`;
+            } else if (days === 0) {
+                return 'Today';
+            } else {
+                return `In ${days} day${days !== 1 ? 's' : ''}`;
+            }
+        }
+
+        function createCardElement(card, checklistData) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'card';
+            
+            // Title
+            if (card.name) {
+                const title = document.createElement('div');
+                title.className = 'card-title';
+                title.textContent = card.name;
+                cardDiv.appendChild(title);
+            }
+            
+            // Due date
+            if (card.due) {
+                const due = document.createElement('div');
+                due.className = 'card-due';
+                due.textContent = `Due: ${formatDate(card.due)}`;
+                cardDiv.appendChild(due);
+            }
+            
+            // Members
+            if (card.members && card.members.length > 0) {
+                const membersWrapper = document.createElement('div');
+                membersWrapper.className = 'members-wrapper';
+                
+                card.members.forEach(member => {
+                    if (member.avatarUrl) {
+                        const avatar = document.createElement('img');
+                        avatar.className = 'member-avatar';
+                        // Ensure avatar URL has the size suffix (e.g., /50.png)
+                        let avatarUrl = member.avatarUrl;
+                        if (!avatarUrl.match(/\/\d+\.(png|jpg|jpeg)$/i)) {
+                            avatarUrl = avatarUrl.replace(/\/$/, '') + '/50.png';
+                        }
+                        avatar.src = avatarUrl;
+                        avatar.alt = member.fullName || member.initials || '';
+                        avatar.title = member.fullName || member.initials || '';
+                        membersWrapper.appendChild(avatar);
+                    }
+                });
+                
+                cardDiv.appendChild(membersWrapper);
+            }
+            
+            // Description
+            if (card.desc) {
+                const desc = document.createElement('div');
+                desc.className = 'card-description';
+                desc.textContent = card.desc;
+                cardDiv.appendChild(desc);
+            }
+            
+            // Checklists
+            if (card.idChecklists && card.idChecklists.length > 0) {
+                const checklistWrapper = document.createElement('div');
+                checklistWrapper.className = 'checklist-wrapper';
+                
+                card.idChecklists.forEach(checklistId => {
+                    const checklist = checklistData[checklistId];
+                    if (checklist && checklist.checkItems) {
+                        if (checklist.name) {
+                            const checklistTitle = document.createElement('div');
+                            checklistTitle.className = 'checklist-title';
+                            checklistTitle.textContent = checklist.name;
+                            checklistWrapper.appendChild(checklistTitle);
+                        }
+                        
+                        checklist.checkItems.forEach(item => {
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'checklist-item ' + (item.state === 'complete' ? 'complete' : '');
+                            itemDiv.textContent = item.name;
+                            checklistWrapper.appendChild(itemDiv);
+                        });
+                    }
+                });
+                
+                if (checklistWrapper.children.length > 0) {
+                    cardDiv.appendChild(checklistWrapper);
+                }
+            }
+            
+            return cardDiv;
+        }
+
+        async function loadCards() {
+            const loadBtn = document.getElementById('loadBtn');
+            const container = document.getElementById('cardsContainer');
+            
+            loadBtn.disabled = true;
+            container.innerHTML = '';
+            showStatus('Loading cards...', 'loading');
+            
+            try {
+                // Get cards
+                const cards = await getCards();
+                
+                if (!cards || !Array.isArray(cards)) {
+                    throw new Error('Invalid response: cards is not an array');
+                }
+                
+                showStatus(`Loaded ${cards.length} card(s)`, 'success');
+                
+                // Fetch members if not included in response
+                const allMemberIds = new Set();
+                cards.forEach(card => {
+                    if (card.idMembers && card.idMembers.length > 0) {
+                        card.idMembers.forEach(id => allMemberIds.add(id));
+                    }
+                });
+                
+                const memberData = {};
+                if (allMemberIds.size > 0 && (!cards[0] || !cards[0].members)) {
+                    showStatus(`Loading ${allMemberIds.size} member(s)...`, 'loading');
+                    const memberPromises = Array.from(allMemberIds).map(id => getMember(id));
+                    const members = await Promise.all(memberPromises);
+                    members.forEach(member => {
+                        if (member) {
+                            memberData[member.id] = member;
+                        }
+                    });
+                    
+                    // Attach members to cards
+                    cards.forEach(card => {
+                        if (card.idMembers && card.idMembers.length > 0) {
+                            card.members = card.idMembers
+                                .map(id => memberData[id])
+                                .filter(m => m !== undefined && m !== null);
+                        }
+                    });
+                }
+                
+                // Get all checklists
+                const checklistIds = cards
+                    .filter(card => card.idChecklists && card.idChecklists.length > 0)
+                    .flatMap(card => card.idChecklists);
+                
+                const checklistData = {};
+                
+                if (checklistIds.length > 0) {
+                    showStatus(`Loading ${checklistIds.length} checklist(s)...`, 'loading');
+                    
+                    const checklistPromises = checklistIds.map(id => getChecklist(id));
+                    const checklists = await Promise.all(checklistPromises);
+                    
+                    checklists.forEach(checklist => {
+                        checklistData[checklist.id] = checklist;
+                    });
+                }
+                
+                // Display cards
+                if (cards.length === 0) {
+                    container.innerHTML = '<div class="status">No cards found in this list.</div>';
+                } else {
+                    cards.forEach(card => {
+                        const cardElement = createCardElement(card, checklistData);
+                        container.appendChild(cardElement);
+                    });
+                }
+                
+                showStatus(`Successfully loaded ${cards.length} card(s) with ${Object.keys(checklistData).length} checklist(s)`, 'success');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                let errorMessage = 'Unknown error occurred';
+                
+                if (error.statusCode) {
+                    errorMessage = `Error ${error.statusCode} (${error.statusMessage}): ${error.responseBody}`;
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                showStatus(errorMessage, 'error');
+                container.innerHTML = `<div class="status error">${errorMessage}</div>`;
+            } finally {
+                loadBtn.disabled = false;
+            }
+        }
+
+        // Auto-load on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadCards();
+        });
+    </script>
+</body>
+</html>

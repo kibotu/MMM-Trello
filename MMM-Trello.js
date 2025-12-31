@@ -160,7 +160,12 @@ Module.register("MMM-Trello", {
                             if (member.avatarUrl) {
                                 var avatar = document.createElement("img");
                                 avatar.className = "member-avatar";
-                                avatar.src = member.avatarUrl;
+                                // Ensure avatar URL has the size suffix (e.g., /50.png)
+                                var avatarUrl = member.avatarUrl;
+                                if (!avatarUrl.match(/\/\d+\.(png|jpg|jpeg)$/i)) {
+                                    avatarUrl = avatarUrl.replace(/\/$/, '') + '/50.png';
+                                }
+                                avatar.src = avatarUrl;
                                 avatar.alt = member.fullName || member.initials || "";
                                 avatar.title = member.fullName || member.initials || "";
                                 membersWrapper.appendChild(avatar);

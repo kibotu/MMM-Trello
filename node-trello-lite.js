@@ -15,7 +15,6 @@ var Trello = module.exports = function (key, token) {
 Trello.prototype.getCards = async function (listId) {
   const queryString = querystring.stringify(this.addAuthArgs({
     fields: "name,desc,due,idChecklists,idMembers",
-    members: "all",
     member_fields: "id,avatarUrl,fullName,initials"
   }));
   const res = await fetch(`${this.host}/1/lists/${listId}/cards?${queryString}`);
