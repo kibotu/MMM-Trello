@@ -63,6 +63,14 @@ module.exports = NodeHelper.create({
         try {
             const cards = await trello.getCards(list);
 
+            if (!cards || !Array.isArray(cards)) {
+                throw {
+                    statusCode: 500,
+                    statusMessage: "Invalid response",
+                    responseBody: "Cards data is not an array"
+                };
+            }
+
             //Get all checklists before sending list
             const cardsWithChecklists = cards.filter(d => !!d.idChecklists);
             const checkListIds = cardsWithChecklists.flatMap(card => card.idChecklists);
@@ -76,7 +84,13 @@ module.exports = NodeHelper.create({
         }
         catch(error) {
             console.log(error);
-            self.sendSocketNotification("TRELLO_ERROR", {id, error});
+            // Format error to ensure it has the expected structure
+            const formattedError = {
+                statusCode: error.statusCode || error.status || 500,
+                statusMessage: error.statusMessage || error.message || "Unknown error",
+                responseBody: error.responseBody || error.toString() || "No error details available"
+            };
+            self.sendSocketNotification("TRELLO_ERROR", {id, error: formattedError});
             return;
         }
     },

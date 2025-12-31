@@ -21,6 +21,14 @@ Trello.prototype.getCards = async function (listId) {
   const res = await fetch(`${this.host}/1/lists/${listId}/cards?${queryString}`);
   if (res.ok) {
     return res.json();
+  } else {
+    const errorText = await res.text();
+    const error = {
+      statusCode: res.status,
+      statusMessage: res.statusText,
+      responseBody: errorText
+    };
+    throw error;
   }
 }
 
@@ -29,6 +37,14 @@ Trello.prototype.getChecklist = async function (checkListId) {
   const res = await fetch(`${this.host}/1/checklists/${checkListId}?${queryString}`);
   if (res.ok) {
     return res.json();
+  } else {
+    const errorText = await res.text();
+    const error = {
+      statusCode: res.status,
+      statusMessage: res.statusText,
+      responseBody: errorText
+    };
+    throw error;
   }
 }
 

@@ -289,13 +289,18 @@ Module.register("MMM-Trello", {
     socketNotificationReceived: function (notification, payload) {
         console.log(payload);
 
-        if (payload.id !== this.identifier) {
-            // not for this module
+        if (!payload || payload.id !== this.identifier) {
+            // not for this module or invalid payload
             return;
         }
 
         if (notification === "TRELLO_ERROR") {
-            this.errorMessage = "Error " + payload.error.statusCode + "(" + payload.error.statusMessage + "): " + payload.error.responseBody;
+            const error = payload.error || {};
+            const statusCode = error.statusCode || "Unknown";
+            const statusMessage = error.statusMessage || "Unknown";
+            const responseBody = error.responseBody || error.message || "No error details";
+            
+            this.errorMessage = "Error " + statusCode + "(" + statusMessage + "): " + responseBody;
             Log.error(this.errorMessage);
 
             this.error = true;
