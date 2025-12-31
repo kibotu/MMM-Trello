@@ -150,6 +150,25 @@ Module.register("MMM-Trello", {
 
                         wrapper.appendChild(name);
                     }
+                    // Display member avatars
+                    if (this.listContent[card].members && this.listContent[card].members.length > 0) {
+                        var membersWrapper = document.createElement("div");
+                        membersWrapper.className = "members-wrapper";
+                        
+                        for (var memberIndex in this.listContent[card].members) {
+                            var member = this.listContent[card].members[memberIndex];
+                            if (member.avatarUrl) {
+                                var avatar = document.createElement("img");
+                                avatar.className = "member-avatar";
+                                avatar.src = member.avatarUrl;
+                                avatar.alt = member.fullName || member.initials || "";
+                                avatar.title = member.fullName || member.initials || "";
+                                membersWrapper.appendChild(avatar);
+                            }
+                        }
+                        
+                        wrapper.appendChild(membersWrapper);
+                    }
                     if(this.config.showDescription){
                         var desc = document.createElement("div");
                         desc.className = "small light " + (this.config.isCompleted ? "is-completed dimmed" : "");
